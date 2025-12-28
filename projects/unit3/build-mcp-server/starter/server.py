@@ -34,7 +34,10 @@ TEMPLATES_DIR = Path(__file__).parent.parent.parent / "templates"
 # TODO: Replace these with your actual implementations
 
 @mcp.tool()
-async def analyze_file_changes(base_branch: str = "main", include_diff: bool = True) -> str:
+async def analyze_file_changes(
+    base_branch: str = "main", 
+    include_diff: bool = True, 
+    max_diff_lines: int = 500) -> str:
     """Get the full diff and list of changed files in the current git repository.
     
     Args:
@@ -55,6 +58,13 @@ async def analyze_file_changes(base_branch: str = "main", include_diff: bool = T
     # working_dir = roots_result.roots[0].uri.path
     # subprocess.run(["git", "diff"], cwd=working_dir)
     
+    diff = subprocess.run(["git", "diff"])
+
+    if include_diff:
+        # base_branch...HEAD > Compare last common commit between base_branch and current branch against latest commit in current branch.
+        # base_branch..HEAD > Compare latest state of base_branch vs current branch
+        diff = subprocess.run(['git', 'diff', f"{base_branch}...HEAD"])
+
     return json.dumps({"error": "Not implemented yet", "hint": "Use subprocess to run git commands"})
 
 
