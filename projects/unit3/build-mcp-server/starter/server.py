@@ -3,6 +3,8 @@ import sys
 import asyncio
 import os
 from typing import Optional
+from urllib.request import url2pathname
+import debugpy
 
 """
 Module 1: Basic MCP Server - Starter Code
@@ -12,7 +14,7 @@ TODO: Implement tools for analyzing git changes and suggesting PR templates
 import json
 import subprocess
 from pathlib import Path
-from urllib.request import url2pathname
+from urllib.parse import urlparse, unquote
 
 from mcp.server.fastmcp import FastMCP
 
@@ -50,6 +52,12 @@ TYPE_MAPPING = {
     "security": "security.md"
 }
 
+@mcp.resource("dir://desktop")
+def desktop() -> list[str]:
+    """List the files in the user's desktop"""
+    desktop = Path.home() / "Desktop"
+    return [str(f) for f in desktop.iterdir()]
+
 @mcp.tool()
 async def analyze_file_changes(
     base_branch: str = "main", 
@@ -64,24 +72,64 @@ async def analyze_file_changes(
         - include_diff: Include the full diff content (default: true)
     """    
     
+    # debugpy.listen(("localhost", 5678))
+    # debugpy.wait_for_client()
     try:
         # get working directory 
-        # By default, MCP servers run commands in their installation directory, not in agent's current working directory. This means your git commands might analyze the wrong repository!
         uri_path = None
-        if working_directory is None:
-            try:
-                context = mcp.get_context()
-                roots_result = await context.session.list_roots()
-                #get first root (this will be the cwd)
-                root = roots_result.roots[0]
-                uri_path = root.uri.path
-                # Convert file:// URI to native path (handles /C:/... on Windows)
-                working_directory = url2pathname(uri_path)
-            except Exception:
-                # if no root, fall back to current dir
-                pass
+        context = ""
+        roots_result = ""
+        root = ""
+        cwd = ""
 
-        cwd = str(Path(working_directory if working_directory else os.getcwd()).resolve())
+        # if working_directory is None:
+        #     try:
+        #         context = mcp.get_context()
+        #         # debugpy.log_to('debug_log/debug.txt')
+        #         roots_result = await context.session.list_roots()
+        #         #get first root (this will be the cwd)
+        #         root = roots_result.roots[0]
+        #         uri_path = root.uri.path
+        #         # Decode URL-encoded path and convert to native path
+        #         working_directory = unquote(uri_path)
+        #         # Strip leading slash on Windows (e.g., /c:/Users -> c:/Users)
+        #         if sys.platform == 'win32' and working_directory.startswith('/'):
+        #             working_directory = working_directory[1:]
+        #     except Exception as e:
+        #         # if no root, fall back to current dir
+        #         context = f"Error getting workspace root: {e}"
+        #         pass
+
+        # Debug output
+        debug_info = {
+            "provided_working_directory": working_directory,
+            "actual_cwd": cwd,
+            "server_process_cwd": os.getcwd(),
+            "server_file_location": str(Path(__file__).parent),
+            "roots_check": None
+        }
+        
+        # Add roots debug info
+        try:
+            context = mcp.get_context()
+            roots_result = await context.session.list_roots()
+            roots = roots_result.roots
+            root = roots[0]
+            # Decode URL-encoded path and convert to native path
+            uri = Path(root.uri).as_uri()
+            cwd = Path(working_directory if working_directory else os.getcwd()).resolve()
+
+            debug_info["roots_check"] = {
+                "found": True,
+                "count": len(roots_result.roots),
+                "roots": [str(root.uri) for root in roots_result.roots],
+                "uri": uri
+            }
+        except Exception as e:
+            debug_info["roots_check"] = {
+                "found": False,
+                "error": str(e)
+            }
 
         # get summary statistics
         stats_output = subprocess.run(
@@ -99,10 +147,12 @@ async def analyze_file_changes(
             cwd=cwd
         )
 
+        diff_output = ""
         # if include_diff=True, get from last common commit
         if include_diff:
             diff = subprocess.run(
                 ["git", "diff", f"{base_branch}...HEAD"],
+                # ["git", "diff",{base_branch}, "HEAD"],
                 capture_output=True,
                 text=True,
                 cwd=cwd
@@ -116,14 +166,17 @@ async def analyze_file_changes(
                 truncated_diff = '\n'.join(diff_lines[:max_diff_lines])
                 truncated_diff += f"\n\n... Diff truncated. Showing {max_diff_lines} of {len(diff_lines)}"
                 diff_output = truncated_diff
-            
-        return json.dumps({
-            "cwd": cwd,
-            "statistics": stats_output.stdout,
-            "total_lines": len(diff_output),
-            "files_changed": changed_filenames.stdout,
-            "diff_output": diff_output if include_diff else "set include_diff=true to see full diff"
-        }, indent=2)
+        
+        return json.dumps(debug_info)
+        # return json.dumps({
+        #     "cwd": cwd,
+        #     "roots_result": str(roots_result),
+        #     "root": str(root),
+        #     "statistics": stats_output.stdout,
+        #     "total_lines": len(diff_output),
+        #     "files_changed": changed_filenames.stdout,
+        #     "diff_output": diff_output if include_diff else "set include_diff=true to see full diff"
+        # }, indent=2)
 
     except Exception as e:
         return json.dumps({ "error": str(e), "uri_path": uri_path, "cwd": cwd })
@@ -173,6 +226,7 @@ async def suggest_template(changes_summary: str, change_type: str) -> str:
 
 
 if __name__ == "__main__":
+    # mcp.run()
     # add option to run single function
     if len(sys.argv) > 1:
         func_name = sys.argv[1]
@@ -183,10 +237,12 @@ if __name__ == "__main__":
                     result = asyncio.run(func())
                 else:
                     result = func()
-                print(f"Running {func_name}: {result}")
+                # print(f"Running {func_name}: {result}")
             except Exception as e:
-                print(f"Error running {func_name}: {e}")
+                pass
+                # print(f"Error running {func_name}: {e}")
         else:
-            print(f"Function '{func_name}' not found or callable.")
+            pass
+            # print(f"Function '{func_name}' not found or callable.")
     else:
         mcp.run()
