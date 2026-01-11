@@ -73,7 +73,7 @@ async def suggest_template(changes_summary: str, change_type: str) -> str:
         changes_summary: Your analysis of what the changes do
         change_type: The type of change you've identified (bug, feature, docs, refactor, test, etc.)
     """
-    # TODO: Implement this tool done
+    # TODO: Implement this tool
     return json.dumps({"error": "Not implemented yet", "hint": "Map change_type to templates"})
 
 
