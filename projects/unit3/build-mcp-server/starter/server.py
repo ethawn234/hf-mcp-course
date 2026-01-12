@@ -78,23 +78,26 @@ async def run_git_command(args: list[str], cwd: str) -> tuple[str, str, int]:
 
 @mcp.tool()
 async def analyze_file_changes(
+    working_directory: str,
     base_branch: str = "main",
     target_branch: Optional[str] = None,
     include_diff: bool = True,
-    max_diff_lines: int = 500,
-    working_directory: Optional[str] = None
+    max_diff_lines: int = 500
 ) -> str:
     """Get the full diff and list of changed files in the current git repository.
     
     Args:
+        working_directory: The git repository directory to analyze (required - pass the user's workspace folder)
         base_branch: Base branch to compare against (default: main)
         target_branch: Branch to compare (default: HEAD/current branch). Can be a branch name like 'feature/my-feature'
         include_diff: Include the full diff content (default: true)
         max_diff_lines: Maximum number of diff lines to include (default: 500)
-        working_directory: Directory to run git commands in (default: current directory)
     """
     try:
-        cwd = str(Path(working_directory if working_directory else os.getcwd()).resolve())
+        cwd = str(Path(working_directory).resolve())
+        
+        if not os.path.isdir(cwd):
+            return json.dumps({"error": f"Directory does not exist: {cwd}"})
         
         target = target_branch if target_branch else "HEAD"
 
