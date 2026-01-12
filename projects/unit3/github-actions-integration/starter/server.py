@@ -46,6 +46,15 @@ TYPE_MAPPING = {
     "security": "security.md"
 }
 
+def get_cwd(working_directory: Optional[str]) -> str:
+    """Get the current working directory."""
+    try:
+        if working_directory:
+            return str(Path(working_directory).resolve())
+        return str(Path.cwd().resolve())
+    except Exception as e:
+        raise ValueError(f"Error resolving working directory: {str(e)}")
+            
 async def run_git_command(args: list[str], cwd: str) -> tuple[str, str, int]:
     """Run a git command asynchronously using a thread pool."""
     import subprocess
@@ -95,10 +104,7 @@ async def analyze_file_changes(
         max_diff_lines: Maximum number of diff lines to include (default: 500)
     """
     try:
-        cwd = str(Path(working_directory).resolve())
-        
-        if not os.path.isdir(cwd):
-            return json.dumps({"error": f"Directory does not exist: {cwd}"})
+        cwd = get_cwd(working_directory)
         
         target = target_branch if target_branch else "HEAD"
         
@@ -290,16 +296,16 @@ async def get_workflow_status(workflow_name: Optional[str] = None) -> str:
 # ===== Module 2: MCP Prompts =====
 
 @mcp.prompt()
-async def analyze_ci_results():
+async def analyze_ci_results(working_directory: str) -> str:
     """Analyze recent CI/CD results and provide insights."""
     # TODO: Implement this prompt
     # Return a string with instructions for Claude to:
     # 1. Use get_recent_actions_events() 
     # 2. Use get_workflow_status()
     # 3. Analyze results and provide insights
-    
-    return "TODO: Implement analyze_ci_results prompt"
+    cwd = get_cwd(working_directory)
 
+    return f"Use the `#get_recent_actions_events` and `#get_workflow_status` tools to analyze recent CI/CD results for this repository at {cwd}. Provide insights on any failures, trends, or areas for improvement based on the workflow runs."
 
 @mcp.prompt()
 async def create_deployment_summary():
