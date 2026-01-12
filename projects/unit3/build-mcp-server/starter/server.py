@@ -97,7 +97,17 @@ async def analyze_file_changes(
         cwd = str(Path(working_directory if working_directory else os.getcwd()).resolve())
         
         target = target_branch if target_branch else "HEAD"
-        
+
+        # get current branch name if target_branch is not provided
+        print("[DEBUG] Running git branch --show-current", file=sys.stderr, flush=True)
+        target_branch_stdout, target_branch_stderr, target_branch_rc = await run_git_command(
+            ["git", "branch", "--show-current"], cwd
+        )
+        print(f"[DEBUG] git branch --show-current done, {target_branch_stdout.strip()}", file=sys.stderr, flush=True)
+        # if first git cmd fails, subsequent cmds likely will too
+        if target_branch_rc != 0:
+            return json.dumps({"error": f"Git error: {target_branch_stderr}", "_debug": debug_info})
+            
         print(f"[DEBUG] Starting analyze_file_changes, cwd={cwd}", file=sys.stderr, flush=True)
         print(f"[DEBUG] Comparing {base_branch}...{target}", file=sys.stderr, flush=True)
         
@@ -107,22 +117,17 @@ async def analyze_file_changes(
             "server_process_cwd": os.getcwd(),
             "server_file_location": str(Path(__file__).parent),
             "base_branch": base_branch,
-            "target_branch": target,
+            "target_branch": target_branch_stdout.strip() if not target_branch else target_branch,
             "roots_check": None
         }
         
         print("[DEBUG] Running git diff --name-status", file=sys.stderr, flush=True)
         
         # Get list of changed files
-        files_stdout, files_stderr, files_rc = await run_git_command(
+        changed_files_stdout, changed_files_stderr, changed_files_rc = await run_git_command(
             ["git", "diff", "--name-status", f"{base_branch}...{target}"],
             cwd
         )
-        print(f"[DEBUG] git diff --name-status done, rc={files_rc}", file=sys.stderr, flush=True)
-        
-        # if first git cmd fails, subsequent cmds likely will too
-        if files_rc != 0:
-            return json.dumps({"error": f"Git error: {files_stderr}", "_debug": debug_info})
         
         print("[DEBUG] Running git diff --stat", file=sys.stderr, flush=True)
         
@@ -162,14 +167,14 @@ async def analyze_file_changes(
         
         analysis = {
             "base_branch": base_branch,
-            "target_branch": target,
-            "files_changed": files_stdout,
+            "target_branch": target_branch_stdout.strip() if not target_branch else target_branch,
+            "files_changed": changed_files_stdout,
             "statistics": stat_stdout,
             "commits": commits_stdout,
-            "diff": diff_content if include_diff else "Diff not included (set include_diff=true to see full diff)",
             "truncated": truncated,
             "total_diff_lines": len(diff_lines),
-            "_debug": debug_info
+            "_debug": debug_info,
+            "diff": diff_content if include_diff else "Diff not included (set include_diff=true to see full diff)"
         }
         
         return json.dumps(analysis, indent=2)
