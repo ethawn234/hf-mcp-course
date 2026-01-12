@@ -71,7 +71,7 @@ async def run_git_command(args: list[str], cwd: str) -> tuple[str, str, int]:
             return "", "Command timed out", 1
     
     try:
-        return await anyio.to_thread.run_sync(_run, cancellable=True)
+        return await anyio.to_thread.run_sync(_run, abandon_on_cancel=True)
     except Exception as e:
         return "", str(e), 1
 
