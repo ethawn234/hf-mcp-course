@@ -15,7 +15,9 @@ EVENTS_FILE = Path(__file__).parent / "github_events.json"
 async def handle_webhook(request):
     """Handle incoming GitHub webhook"""
     try:
-        data = await request.json()
+        print("📥 Received GitHub webhook")
+        req_data = await request.json()
+        data = json.loads(req_data["payload"])
         
         # Create event record
         event = {
