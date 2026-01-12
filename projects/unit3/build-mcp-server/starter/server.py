@@ -128,7 +128,7 @@ async def analyze_file_changes(
         await ctx.info("Running git diff --name-status")
         
         # Get list of changed files
-        changed_files_stdout, changed_files_stderr, changed_files_rc = await run_git_command(
+        changed_files_stdout, _, _ = await run_git_command(
             ["git", "diff", "--name-status", f"{base_branch}...{target}"],
             cwd
         )
