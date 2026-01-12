@@ -1,23 +1,22 @@
 #!/usr/bin/env python3
 """
-Module 2: GitHub Actions Integration - STARTER CODE
-Extend your PR Agent with webhook handling and MCP Prompts for CI/CD workflows.
+Module 1: Basic MCP Server with PR Template Tools
+A minimal MCP server that provides tools for analyzing file changes and suggesting PR templates.
 """
-
 import json
 import os
-import subprocess
+import sys
 from typing import Optional
 from pathlib import Path
 from datetime import datetime
 
-from mcp.server.fastmcp import FastMCP
+import anyio
+from mcp.server.fastmcp import FastMCP, Context
 
-# Initialize the FastMCP server
-mcp = FastMCP("pr-agent-actions")
+mcp = FastMCP("pr-agent")
 
-# PR template directory (shared between starter and solution)
 TEMPLATES_DIR = Path(__file__).parent.parent.parent / "templates"
+EVENTS_FILE = Path(__file__).parent / "github_events.json"
 
 # Default PR templates
 DEFAULT_TEMPLATES = {
@@ -29,9 +28,6 @@ DEFAULT_TEMPLATES = {
     "performance.md": "Performance",
     "security.md": "Security"
 }
-
-# TODO: Add path to events file where webhook_server.py stores events
-# Hint: EVENTS_FILE = Path(__file__).parent / "github_events.json"
 
 # Type mapping for PR templates
 TYPE_MAPPING = {
@@ -50,82 +46,147 @@ TYPE_MAPPING = {
     "security": "security.md"
 }
 
+async def run_git_command(args: list[str], cwd: str) -> tuple[str, str, int]:
+    """Run a git command asynchronously using a thread pool."""
+    import subprocess
+    
+    def _run():
+        env = os.environ.copy()
+        
+        proc = subprocess.Popen(
+            args,
+            cwd=cwd,
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            stdin=subprocess.DEVNULL,
+            text=True,
+        )
+        try:
+            stdout, stderr = proc.communicate(timeout=30)
+            return stdout, stderr, proc.returncode
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.communicate()
+            return "", "Command timed out", 1
+    
+    try:
+        return await anyio.to_thread.run_sync(_run, abandon_on_cancel=True)
+    except Exception as e:
+        return "", str(e), 1
 
-# ===== Module 1 Tools (Already includes output limiting fix from Module 1) =====
 
 @mcp.tool()
 async def analyze_file_changes(
+    ctx: Context,
+    working_directory: str,
     base_branch: str = "main",
+    target_branch: Optional[str] = None,
     include_diff: bool = True,
-    max_diff_lines: int = 500
+    max_diff_lines: int = 500    
 ) -> str:
     """Get the full diff and list of changed files in the current git repository.
     
     Args:
+        working_directory: The git repository directory to analyze (required - pass the user's workspace folder)
         base_branch: Base branch to compare against (default: main)
+        target_branch: Branch to compare (default: HEAD/current branch). Can be a branch name like 'feature/my-feature'
         include_diff: Include the full diff content (default: true)
         max_diff_lines: Maximum number of diff lines to include (default: 500)
     """
     try:
+        cwd = str(Path(working_directory).resolve())
+        
+        if not os.path.isdir(cwd):
+            return json.dumps({"error": f"Directory does not exist: {cwd}"})
+        
+        target = target_branch if target_branch else "HEAD"
+        
+        # get current branch name if target_branch is not provided
+        await ctx.info("Running git branch --show-current")
+        target_branch_stdout, target_branch_stderr, target_branch_rc = await run_git_command(
+            ["git", "branch", "--show-current"], cwd
+        )
+        await ctx.info(f"git branch --show-current done, {target_branch_stdout.strip()}")
+        # if first git cmd fails, subsequent cmds likely will too
+        if target_branch_rc != 0:
+            return json.dumps({"error": f"Git error: {target_branch_stderr}", "_debug": debug_info})
+            
+        await ctx.info(f"Starting analyze_file_changes, cwd={cwd}")
+        await ctx.info(f"Comparing {base_branch}...{target}")
+        
+        debug_info = {
+            "provided_working_directory": working_directory,
+            "actual_cwd": cwd,
+            "server_process_cwd": os.getcwd(),
+            "server_file_location": str(Path(__file__).parent),
+            "base_branch": base_branch,
+            "target_branch": target_branch_stdout.strip() if not target_branch else target_branch,
+            "roots_check": None
+        }
+        
+        await ctx.info("Running git diff --name-status")
+        
         # Get list of changed files
-        files_result = subprocess.run(
-            ["git", "diff", "--name-status", f"{base_branch}...HEAD"],
-            capture_output=True,
-            text=True,
-            check=True
+        changed_files_stdout, _, _ = await run_git_command(
+            ["git", "diff", "--name-status", f"{base_branch}...{target}"],
+            cwd
         )
         
+        await ctx.info("Running git diff --stat")
+        
         # Get diff statistics
-        stat_result = subprocess.run(
-            ["git", "diff", "--stat", f"{base_branch}...HEAD"],
-            capture_output=True,
-            text=True
+        stat_stdout, _, _ = await run_git_command(
+            ["git", "diff", "--stat", f"{base_branch}...{target}"],
+            cwd
         )
+        await ctx.info("git diff --stat done")
         
         # Get the actual diff if requested
         diff_content = ""
         truncated = False
+        diff_lines = []
         if include_diff:
-            diff_result = subprocess.run(
-                ["git", "diff", f"{base_branch}...HEAD"],
-                capture_output=True,
-                text=True
+            await ctx.info("Running git diff")
+            diff_stdout, _, _ = await run_git_command(
+                ["git", "diff", f"{base_branch}...{target}"],
+                cwd
             )
-            diff_lines = diff_result.stdout.split('\n')
+            await ctx.info("git diff done")
+            diff_lines = diff_stdout.split('\n')
             
-            # Check if we need to truncate (learned from Module 1)
             if len(diff_lines) > max_diff_lines:
                 diff_content = '\n'.join(diff_lines[:max_diff_lines])
                 diff_content += f"\n\n... Output truncated. Showing {max_diff_lines} of {len(diff_lines)} lines ..."
                 diff_content += "\n... Use max_diff_lines parameter to see more ..."
                 truncated = True
             else:
-                diff_content = diff_result.stdout
+                diff_content = diff_stdout
         
         # Get commit messages for context
-        commits_result = subprocess.run(
-            ["git", "log", "--oneline", f"{base_branch}..HEAD"],
-            capture_output=True,
-            text=True
+        commits_stdout, _, _ = await run_git_command(
+            ["git", "log", "--oneline", f"{base_branch}..{target}"],
+            cwd
         )
         
         analysis = {
             "base_branch": base_branch,
-            "files_changed": files_result.stdout,
-            "statistics": stat_result.stdout,
-            "commits": commits_result.stdout,
-            "diff": diff_content if include_diff else "Diff not included (set include_diff=true to see full diff)",
+            "target_branch": target_branch_stdout.strip() if not target_branch else target_branch,
+            "files_changed": changed_files_stdout,
+            "statistics": stat_stdout,
+            "commits": commits_stdout,
             "truncated": truncated,
-            "total_diff_lines": len(diff_lines) if include_diff else 0
+            "total_diff_lines": len(diff_lines),
+            "_debug": debug_info,
+            "diff": diff_content if include_diff else "Diff not included (set include_diff=true to see full diff)"
         }
-        
+
         return json.dumps(analysis, indent=2)
         
-    except subprocess.CalledProcessError as e:
-        return json.dumps({"error": f"Git error: {e.stderr}"})
+    except TimeoutError:
+        return json.dumps({"error": "Git command timed out"})
     except Exception as e:
         return json.dumps({"error": str(e)})
-
 
 @mcp.tool()
 async def get_pr_templates() -> str:
@@ -150,12 +211,9 @@ async def suggest_template(changes_summary: str, change_type: str) -> str:
         changes_summary: Your analysis of what the changes do
         change_type: The type of change you've identified (bug, feature, docs, refactor, test, etc.)
     """
-    
-    # Get available templates
     templates_response = await get_pr_templates()
     templates = json.loads(templates_response)
     
-    # Find matching template
     template_file = TYPE_MAPPING.get(change_type.lower(), "feature.md")
     selected_template = next(
         (t for t in templates if t["filename"] == template_file),
