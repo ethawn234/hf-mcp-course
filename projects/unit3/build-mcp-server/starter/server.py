@@ -10,7 +10,7 @@ from typing import Optional
 from pathlib import Path
 
 import anyio
-from mcp.server.fastmcp import FastMCP
+from mcp.server.fastmcp import FastMCP, Context
 
 # Initialize the FastMCP server
 mcp = FastMCP("pr-agent")
@@ -78,11 +78,12 @@ async def run_git_command(args: list[str], cwd: str) -> tuple[str, str, int]:
 
 @mcp.tool()
 async def analyze_file_changes(
+    ctx: Context,
     working_directory: str,
     base_branch: str = "main",
     target_branch: Optional[str] = None,
     include_diff: bool = True,
-    max_diff_lines: int = 500
+    max_diff_lines: int = 500    
 ) -> str:
     """Get the full diff and list of changed files in the current git repository.
     
@@ -100,19 +101,19 @@ async def analyze_file_changes(
             return json.dumps({"error": f"Directory does not exist: {cwd}"})
         
         target = target_branch if target_branch else "HEAD"
-
+        
         # get current branch name if target_branch is not provided
-        print("[DEBUG] Running git branch --show-current", file=sys.stderr, flush=True)
+        await ctx.info("Running git branch --show-current")
         target_branch_stdout, target_branch_stderr, target_branch_rc = await run_git_command(
             ["git", "branch", "--show-current"], cwd
         )
-        print(f"[DEBUG] git branch --show-current done, {target_branch_stdout.strip()}", file=sys.stderr, flush=True)
+        await ctx.info(f"git branch --show-current done, {target_branch_stdout.strip()}")
         # if first git cmd fails, subsequent cmds likely will too
         if target_branch_rc != 0:
             return json.dumps({"error": f"Git error: {target_branch_stderr}", "_debug": debug_info})
             
-        print(f"[DEBUG] Starting analyze_file_changes, cwd={cwd}", file=sys.stderr, flush=True)
-        print(f"[DEBUG] Comparing {base_branch}...{target}", file=sys.stderr, flush=True)
+        await ctx.info(f"Starting analyze_file_changes, cwd={cwd}")
+        await ctx.info(f"Comparing {base_branch}...{target}")
         
         debug_info = {
             "provided_working_directory": working_directory,
@@ -124,7 +125,7 @@ async def analyze_file_changes(
             "roots_check": None
         }
         
-        print("[DEBUG] Running git diff --name-status", file=sys.stderr, flush=True)
+        await ctx.info("Running git diff --name-status")
         
         # Get list of changed files
         changed_files_stdout, changed_files_stderr, changed_files_rc = await run_git_command(
@@ -132,26 +133,26 @@ async def analyze_file_changes(
             cwd
         )
         
-        print("[DEBUG] Running git diff --stat", file=sys.stderr, flush=True)
+        await ctx.info("Running git diff --stat")
         
         # Get diff statistics
         stat_stdout, _, _ = await run_git_command(
             ["git", "diff", "--stat", f"{base_branch}...{target}"],
             cwd
         )
-        print("[DEBUG] git diff --stat done", file=sys.stderr, flush=True)
+        await ctx.info("git diff --stat done")
         
         # Get the actual diff if requested
         diff_content = ""
         truncated = False
         diff_lines = []
         if include_diff:
-            print("[DEBUG] Running git diff", file=sys.stderr, flush=True)
+            await ctx.info("Running git diff")
             diff_stdout, _, _ = await run_git_command(
                 ["git", "diff", f"{base_branch}...{target}"],
                 cwd
             )
-            print("[DEBUG] git diff done", file=sys.stderr, flush=True)
+            await ctx.info("git diff done")
             diff_lines = diff_stdout.split('\n')
             
             if len(diff_lines) > max_diff_lines:
@@ -179,7 +180,7 @@ async def analyze_file_changes(
             "_debug": debug_info,
             "diff": diff_content if include_diff else "Diff not included (set include_diff=true to see full diff)"
         }
-        
+
         return json.dumps(analysis, indent=2)
         
     except TimeoutError:
