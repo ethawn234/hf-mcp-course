@@ -244,8 +244,12 @@ async def get_recent_actions_events(limit: int = 10) -> str:
     # 2. Read the JSON file
     # 3. Return the most recent events (up to limit)
     # 4. Return empty list if file doesn't exist
-    
-    return json.dumps({"message": "TODO: Implement get_recent_actions_events"})
+    try:
+        with open(EVENTS_FILE, 'r') as f:
+            events = json.load(f)
+        return json.dumps(events[-limit:], indent=2)
+    except FileNotFoundError:
+        return json.dumps([])
 
 
 @mcp.tool()
@@ -261,8 +265,26 @@ async def get_workflow_status(workflow_name: Optional[str] = None) -> str:
     # 3. If workflow_name provided, filter by that name
     # 4. Group by workflow and show latest status
     # 5. Return formatted workflow status information
-    
-    return json.dumps({"message": "TODO: Implement get_workflow_status"})
+    try:
+        filter_events = []
+
+        with open(EVENTS_FILE, 'r') as f:
+            events = json.load(f)
+            # get list of events where the event_type == "workflow_run"
+            for event in events:
+                if event["event_type"] == "workflow_run":
+                    name = event.get("workflow_run", {}).get("name")
+                    if name is not None or name != "":
+                        info = {
+                            "workflow_name": name,
+                            "status": event.get("workflow_run", {}).get("status"),
+                            "conclusion": event.get("workflow_run", {}).get("conclusion"),
+                        }
+                        filter_events.append(info)
+        filter_events.sort(key=lambda x: x.get("workflow_name", ""))
+        return json.dumps(filter_events, indent=2)
+    except Exception as e:
+        return json.dumps({"error": str(e)})
 
 
 # ===== Module 2: MCP Prompts =====
