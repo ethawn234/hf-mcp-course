@@ -1,0 +1,20 @@
+{
+	"servers": {
+		"pr-agent-alt-config": {
+			"command": "uv",
+			"args": [
+				"run",
+				"server.py"
+			],
+			"cwd": "full/path/to/pr-agent/server",
+			"dev": {
+				"watch": "**/*.py",
+				"debug": {
+					"type": "debugpy"
+				}
+			},
+			"type": "stdio"
+		}
+	},
+	"inputs": []
+}
