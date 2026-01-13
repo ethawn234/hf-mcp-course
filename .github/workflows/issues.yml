@@ -1,0 +1,17 @@
+name: check issues
+on:
+  issues:
+    types: [opened, edited]
+jobs:
+  issue_details:
+    runs-on: ubuntu-latest
+    steps:
+      # each step starts with dash (-); all children tasks, or keys, goes under a single dashed field
+      - name: Echo issue details
+        env:
+          ISSUE_EVENT_TITLE: ${{ github.event.issue.title }}
+          ISSUE_EVENT_BODY: ${{ github.event.issue.body }}
+          # double quote sh cmd's to avoid problems like whitespace
+        run: |
+          echo "$ISSUE_EVENT_TITLE"
+          echo "$ISSUE_EVENT_BODY"

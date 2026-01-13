@@ -1,0 +1,22 @@
+name: Access & Output Contexts
+
+on: [workflow_dispatch]
+
+jobs:
+  runnerContext:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Output runner context
+        run: echo '${{ toJson(runner) }}'
+
+      - name: Output github context
+        run: echo '${{ toJson(github) }}'
+
+      - name: Output env context
+        run: echo '${{ toJson(env) }}'
+
+      - name: Output vars context
+        run: echo '${{ toJson(vars) }}'
+
+      - name: Output secrets context
+        run: echo '${{ toJson(secrets) }}'

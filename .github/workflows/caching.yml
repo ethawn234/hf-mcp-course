@@ -1,0 +1,70 @@
+name: Use caching
+on: workflow_dispatch
+# on:
+#   push:
+#     branches:
+#       - main
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get code
+        uses: actions/checkout@v3
+
+      - name: Cache dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.npm
+          key: deps-node-modules-${{ hashFiles('**/package-lock.json') }}
+
+      - name: Install dependencies
+        run: npm ci
+      # - name: Lint code
+      #   run: npm run lint
+      # - name: Test code
+      #   run: npm run test
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    outputs:
+      script: ${{ steps.js-script.outputs.script }}
+    steps:
+      - name: Get code
+        uses: actions/checkout@v3
+
+      - name: Cache dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.npm
+          key: deps-node-modules-${{ hashFiles('**/package-lock.json') }}
+
+      - name: Install dependencies
+        run: npm ci
+      - name: Build website
+        run: npm run build
+      - name: Output JS Script file
+        id: js-script
+        run: find dist/assets/*.js -type f -execdir echo 'script={}' >> $GITHUB_OUTPUT ';'
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: demo_build_artifact # optional name of artifact to upload; defaults to 'artifact'
+          path: dist
+          # path: |
+          # dist # output folder containing generated build assets
+          # package.json # includes specific file
+          if-no-files-found: error
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: demo_build_artifact
+      - name: List app dir
+        run: ls
+      - name: Echo output var script
+        run: echo ${{ needs.build.outputs.script }}
+      - name: Deploy
+        run: echo "Deploying..."

@@ -1,0 +1,47 @@
+name: Use env-vars
+on: workflow_dispatch
+# on:
+#   push:
+#     branches:
+#       - main
+#       - dev
+
+env: # workflow level env vars
+  MONGODB_DB_NAME: gha-demo
+
+jobs:
+  test:
+    env: # job level env vars
+      DB_NAME: someDB
+      DB_USERNAME: ethawn234
+      DB_PASSWORD: ${{ secrets.MONGODB_PASSWORD }}
+      PORT: 4009
+    environment: testing # corresponds to the environment configured in remote repo site; references to secrets|variables will reference testing env vars
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get Code
+        uses: actions/checkout@v3
+      - name: Cache dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.npm
+          key: npm-deps-${{ hashFiles('**/package-lock.json') }}
+      - name: Install dependencies
+        run: npm ci
+      # - name: Run server
+      #   run: npm start & npx wait-on http://127.0.0.1:$PORT # PORT env usage
+      # - name: Run tests
+      #   run: npm test
+      - name: Output information
+        run: |
+          echo $DB_NAME
+          echo $DB_USERNAME
+          echo $DB_PASSWORD
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Output information
+        run: |
+          echo $DB_USERNAME
+          echo $MONGODB_DB_NAME

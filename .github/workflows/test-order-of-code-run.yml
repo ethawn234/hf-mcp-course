@@ -1,0 +1,16 @@
+name: test-order-of-code-run
+on: [workflow_dispatch, push]
+
+jobs:
+  test_matrix:
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - run: |
+          echo "I am farmer"
+          echo "${{ toJson(runner) }}"
+
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]

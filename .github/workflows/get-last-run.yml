@@ -1,0 +1,54 @@
+name: get-last-run.yml
+on: workflow_dispatch
+
+jobs:
+  get-last-run:
+    environment: testing
+    runs-on: ubuntu-latest
+    outputs:
+      last_status: ${{ steps.last_status.outputs.last_status }}
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+      - name: Get branch name
+        shell: bash
+        run: |
+          if [[ ${GITHUB_EVENT_NAME} == "pull_request" ]]
+          then
+            echo "BRANCH_NAME=$(echo ${GITHUB_HEAD_REF})" >> $GITHUB_ENV
+            echo "Branch name: ${GITHUB_HEAD_REF}"
+          else
+            echo "BRANCH_NAME=$(echo ${GITHUB_REF#refs/heads/})" >> $GITHUB_ENV
+            echo "Branch name: ${GITHUB_REF#refs/heads/}"        
+          fi
+      - name: Get workflow id
+        shell: bash
+        # env:
+        #   REPOSITORY: "gha-data"
+          
+        run: |
+          echo -e "api_url: ${{ github.api_url }}"
+          echo -e "repository: ${{ github.repository }}"
+          echo -e "run_id: ${{ github.run_id }}"
+          
+          WORKFLOW_ID=$(curl -H Authorization: Bearer "${{ secrets.demoToken }}" \
+          --header "content-type: application/json" \
+          "${{ github.api_url }}/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+          | jq -r .workflow_id)
+
+          echo "WORKFLOW_ID=$WORKFLOW_ID" >> $GITHUB_ENV
+          echo "Workflow id: ${WORKFLOW_ID}"
+      
+      - name: Get previous build status
+        shell: bash
+        id: last_status
+        run: |
+          last_status=$(curl --silent --header "authorization: Bearer ${{ secrets.demoToken }}" \
+          --header "content-type: application/json" \
+          "${{ github.api_url }}/repos/${{ github.repository }}/actions/workflows/${{ env.WORKFLOW_ID }}/runs?per_page=1&status=success&branch=${{ env.BRANCH_NAME }}" \
+          | jq -r .workflow_runs[0].conclusion)
+          
+          echo "last_status=$last_status" >> $GITHUB_OUTPUT
+          echo "Status of the previous build: $last_status"
+

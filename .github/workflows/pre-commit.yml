@@ -1,0 +1,51 @@
+name: Use pre-commit
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+  # schedule:
+  #   - cron: '15 8 * * *'
+
+jobs:
+  job1:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - run: |
+          echo "pre-commit" > requirements.txt
+
+      # - name: Setup Python
+      #   uses: actions/setup-python@v5
+      #   with:
+      #     cache: pip
+      - run: |
+          sudo apt-get update
+          sudo apt-get install -y python3 python3-pip
+
+      - name: Install pre-commit
+        run: |
+          echo "BEFORE pip config list:"
+          pip3 config list
+          echo -e "\npip install verbose output:"
+          pip3 install --upgrade pip --verbose
+          echo "AFTER pip config list:"
+          pip3 config list
+          pip3 install pre-commit
+          pre-commit install
+
+      - name: Validations
+        run: |
+          echo '${{ toJson(runner) }}'
+          python3 --version
+          pip3 --version
+          pre-commit --version
+
+      - name: Run pre-commit
+        run: |
+          pwd
+          # SKIP=prettier pre-commit run  --all-files
+          pre-commit run --all-files --show-diff-on-failure -v
