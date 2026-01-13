@@ -304,7 +304,17 @@ async def analyze_ci_results() -> str:
     # 2. Use get_workflow_status()
     # 3. Analyze results and provide insights
 
-    return f"Use the #get_recent_actions_events and #get_workflow_status tools to analyze recent CI/CD results. Provide insights on any failures, trends, or areas for improvement based on the workflow runs."
+    # return f"Use the #get_recent_actions_events and #get_workflow_status tools to analyze recent CI/CD results. Provide insights on any failures, trends, or areas for improvement based on the workflow runs."
+    return """Generate a detailed analysis of recent CI/CD results using the following steps:
+1. Invoke the #get_recent_actions_events tool to retrieve the latest GitHub Actions events.
+2. Invoke the #get_workflow_status tool to get the current status of workflows.
+3. Analyze the combined data to identify any failures, trends, or areas for improvement.
+4. Provide a comprehensive report summarizing your findings and recommendations in the following format:
+    - Summary of recent CI/CD activity
+    - Identified failures and their potential causes
+    - Trends observed in workflow runs
+    - Recommendations for improving CI/CD processes
+"""
 
 @mcp.prompt()
 async def create_deployment_summary():
