@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Module 1: Basic MCP Server with PR Template Tools
+Module 2: Basic MCP Server with PR Template Tools
 A minimal MCP server that provides tools for analyzing file changes and suggesting PR templates.
 """
 import json
@@ -296,16 +296,15 @@ async def get_workflow_status(workflow_name: Optional[str] = None) -> str:
 # ===== Module 2: MCP Prompts =====
 
 @mcp.prompt()
-async def analyze_ci_results(working_directory: str) -> str:
+async def analyze_ci_results() -> str:
     """Analyze recent CI/CD results and provide insights."""
     # TODO: Implement this prompt
     # Return a string with instructions for Claude to:
     # 1. Use get_recent_actions_events() 
     # 2. Use get_workflow_status()
     # 3. Analyze results and provide insights
-    cwd = get_cwd(working_directory)
 
-    return f"Use the `#get_recent_actions_events` and `#get_workflow_status` tools to analyze recent CI/CD results for this repository at {cwd}. Provide insights on any failures, trends, or areas for improvement based on the workflow runs."
+    return f"Use the #get_recent_actions_events and #get_workflow_status tools to analyze recent CI/CD results. Provide insights on any failures, trends, or areas for improvement based on the workflow runs."
 
 @mcp.prompt()
 async def create_deployment_summary():
