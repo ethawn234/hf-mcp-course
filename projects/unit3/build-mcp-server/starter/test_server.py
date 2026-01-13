@@ -46,7 +46,7 @@ class TestAnalyzeFileChanges:
         with patch('subprocess.run') as mock_run:
             mock_run.return_value = MagicMock(stdout="", stderr="")
             
-            result = await analyze_file_changes()
+            result = await analyze_file_changes(working_directory=".")
             
             assert isinstance(result, str), "Should return a string"
             # Should be valid JSON
@@ -59,7 +59,7 @@ class TestAnalyzeFileChanges:
         with patch('subprocess.run') as mock_run:
             mock_run.return_value = MagicMock(stdout="M\tfile1.py\n", stderr="")
             
-            result = await analyze_file_changes()
+            result = await analyze_file_changes(working_directory=".")
             data = json.loads(result)
             
             # For starter code, accept error messages; for full implementation, expect data

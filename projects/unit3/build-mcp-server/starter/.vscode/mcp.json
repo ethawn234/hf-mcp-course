@@ -1,0 +1,10 @@
+{
+	"servers": {
+		"pr-agent": {
+      "command": "uv",
+      "args": ["run", "server.py"],
+      "cwd": "abs/path/to/server"
+    }
+	},
+	"inputs": []
+}
