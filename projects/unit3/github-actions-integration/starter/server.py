@@ -292,6 +292,21 @@ async def get_workflow_status(workflow_name: Optional[str] = None) -> str:
     except Exception as e:
         return json.dumps({"error": str(e)})
 
+@mcp.tool()
+async def get_latest_runs_for_notification(limit: int = 5) -> list[str]:
+    """Get the latest workflow runs for notification purposes.
+
+    **Implement if needed for remaining course sections**
+
+    1. Tracks which events have been notified already
+    2. Highlights new failures
+    3. Suggests which team member to notify
+
+    Args:
+        limit: Maximum number of workflow runs to return (default: 5)
+    """
+
+    return []
 
 # ===== Module 2: MCP Prompts =====
 
