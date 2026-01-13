@@ -4,7 +4,22 @@
 
 ## 1/13/26
 
-### Todos
+### Next Steps
+
+- Add logic to auto-call Agent and run tool to send Slack Notification for critical Github Action failures. 
+  - For now just send all run failures.
+  - This will probably need to invoke the Agent via a shell command.
+  - Replicate `analyze_file_changes` logic to avoid event blocking when running subprocesses.
+- Add additional unit tests to cover new features.
+- Update existing tests to cover workarounds for OS and proxy server differences.
+- Fix all typing issues highlighted in code.
+- Fix issue with `cwd` when `mcp.json` is configured in a User Profile instead of within repo.
+- Add OAuth. This is a bigger task - since machine-to-machine is the desired end-goal, client credentials flow? Need to research more.
+  - See the Client Credentials implementation for Jira/Coding Agent integration. The issue there is I don't think Atlassian offers Client Credentials flow, only Authorization Code Grant with PCKE.
+- Document the Slack/Agent/Webhook integration flow.
+- Implement security guardrails for enterprise use cases. See the "How to MCP" blog for hints (also has good advice on implementing OAuth).
+
+### Timeline
 
 - Add a prompt for sending Slack Notifications.
 
